@@ -1,15 +1,26 @@
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
 import path from 'path';
 
 // https://vitejs.dev/config/
-export default defineConfig(({ command }) => ({
+export default defineConfig(async ({ command, mode }) => {
   // Use relative base in build so dist/index.html can be opened via file:// in Electron
-  base: command === 'serve' ? '/' : './',
-  plugins: [react()],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, 'src'),
+  const base = command === 'serve' ? '/' : './';
+
+  // During Vitest, avoid importing ESM-only plugin to prevent require() issues
+  const isVitest = process.env.VITEST || mode === 'test';
+  const plugins = [] as any[];
+  if (!isVitest) {
+    const react = (await import('@vitejs/plugin-react')).default;
+    plugins.push(react());
+  }
+
+  return {
+    base,
+    plugins,
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, 'src'),
+      },
     },
-  },
-}));
+  };
+});

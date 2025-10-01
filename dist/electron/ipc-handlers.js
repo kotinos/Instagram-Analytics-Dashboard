@@ -32,7 +32,7 @@ ipcMain.handle('db:init', async () => {
 
 ipcMain.handle('db:add-creator', async (_event, data) => {
   const schema = Joi.object({
-    username: Joi.string().trim().alphanum().min(1).max(30).required(),
+    username: Joi.string().trim().pattern(/^[A-Za-z0-9._-]+$/).min(1).max(30).required(),
     displayName: Joi.string().trim().max(100).optional(),
   });
   const { error, value } = schema.validate(data);
@@ -49,7 +49,7 @@ ipcMain.handle('db:list-creators', async () => {
 // Scraping IPC
 ipcMain.handle('scrape:enqueue', async (_event, payload) => {
   const schema = Joi.object({
-    username: Joi.string().trim().alphanum().min(1).max(30).required(),
+    username: Joi.string().trim().pattern(/^[A-Za-z0-9._-]+$/).min(1).max(30).required(),
   });
   const { error, value } = schema.validate(payload);
   if (error) throw new Error(error.message);
@@ -89,7 +89,7 @@ ipcMain.handle('scrape:enqueue', async (_event, payload) => {
 
 ipcMain.handle('scrape:bulk', async (_event, payload) => {
   const schema = Joi.object({
-    usernames: Joi.array().items(Joi.string().trim().alphanum().min(1).max(30)).min(1).max(100).required(),
+    usernames: Joi.array().items(Joi.string().trim().pattern(/^[A-Za-z0-9._-]+$/).min(1).max(30)).min(1).max(100).required(),
   });
   const { error, value } = schema.validate(payload);
   if (error) throw new Error(error.message);

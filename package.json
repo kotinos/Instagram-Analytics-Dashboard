@@ -12,6 +12,9 @@
     "build": "electron-builder --dir",
     "package": "electron-builder",
     "lint": "echo 'todo: add eslint'",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "rebuild:native": "electron-rebuild -f -w better-sqlite3",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
@@ -49,10 +52,12 @@
     "concurrently": "^8.2.0",
     "cross-env": "^7.0.3",
     "electron": "^27.0.0",
-    "electron-builder": "^24.6.0",
+  "electron-builder": "^24.6.0",
+  "electron-rebuild": "^3.2.9",
     "electron-devtools-installer": "^3.2.0",
     "typescript": "^5.3.2",
     "vite": "^4.5.0",
+    "vitest": "^1.5.0",
     "wait-on": "^7.2.0"
   }
 }

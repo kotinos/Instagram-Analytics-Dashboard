@@ -1,6 +1,6 @@
 # Instagram Analytics Dashboard
 
-A Windows desktop app scaffold built with Electron + Vite + React + TypeScript and SQLite (better-sqlite3). This Phase 1 foundation includes a secure Electron preload, IPC handlers with Joi validation, and database migrations so you can run the app locally and verify end-to-end IPC and DB operations.
+Windows desktop app built with Electron + Vite + React + TypeScript and SQLite (better-sqlite3). This foundation includes a secure preload, validated IPC, database migrations, a resilient scraping queue, and nightly DB backups. Use these instructions to run the app directly with `npx electron .` or via the dev server.
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ Verify your Node version:
 node -v
 ```
 
-## Run locally
+## Quick start (recommended)
 
 1) Install dependencies
 
@@ -22,24 +22,27 @@ node -v
 npm install
 ```
 
-2) Start the dev environment (Vite + Electron)
+2) Build the renderer bundle (used by Electron in non-dev)
 
 ```powershell
-npm run dev
+npm run build:renderer
 ```
 
-What happens:
-- Vite dev server starts on http://localhost:5173
-- Electron launches and loads the renderer (with context isolation + secure preload)
+3) Rebuild native modules for your Electron version (better-sqlite3)
 
-3) Smoke test in the app
-- Click “Ping main” to verify secure IPC (expect: Reply: pong)
-- Add a creator username and click “Add” to insert a record
-- Click “Refresh” to list creators from the local SQLite database
+```powershell
+npm run rebuild:native
+```
 
-Database location:
-- `database/analytics.db`
-- Migrations run automatically when the app initializes the DB (via `db:init` IPC handler)
+4) Launch the app
+
+```powershell
+npx electron .
+```
+
+On first launch, migrations will run automatically, the window opens with a basic dashboard, and nightly DB backups are scheduled.
+
+Database path: `database/analytics.db` (WAL and foreign_keys enabled)
 
 ## Environment configuration
 
@@ -52,41 +55,51 @@ LOG_LEVEL=info
 ```
 
 Notes:
-- `VITE_DEV_SERVER` is set by the dev script; you typically don’t need to change it.
+- `VITE_DEV_SERVER` is set by the dev script; you usually don’t need to set it manually.
+- Optional proxy list for scraping: `PROXIES=http://user:pass@host:port,http://host2:port` (round‑robin)
 - Keep secrets out of `.env`; never hardcode sensitive values (see AGENTS.md).
 
 ## Scripts
 
 ```powershell
-# Start Vite + Electron (development)
+## Development
 npm run dev
 
-# Build the renderer only (Vite)
+## Build renderer bundle
 npm run build:renderer
 
-# Package the Electron app (creates distributables under dist/)
+## Package Electron app (installer under dist/)
 npm run package
 
-# Type-check the project (no emit)
-npx tsc --noEmit
+## Rebuild native modules for Electron (better-sqlite3)
+npm run rebuild:native
+
+## Type-check (no emit)
+npm run typecheck
+
+## Run tests (vitest)
+npm run test
 ```
 
 Build packaging notes:
 - Windows NSIS target is configured via `electron-builder.yml`
 - Code signing is optional for local testing; for signed builds set `certificateFile` and `CERT_PASSWORD`
 
-## Project layout (Phase 1)
+## Project layout (foundation)
 
 ```
 public/
 	electron/
-		main.js          # Electron main process (contextIsolation enabled)
-		preload.js       # Secure preload exposing a small, whitelisted API
-		ipc-handlers.js  # IPC endpoints (Joi validation + better-sqlite3)
+		main.cjs          # Electron main process (contextIsolation, CSP in prod)
+		preload.cjs       # Secure preload exposing a whitelisted API (no direct ipcRenderer)
+		ipc-handlers.cjs  # IPC endpoints (Joi validation, DB + scraping orchestration)
+		queue.cjs         # Concurrency, backoff, custom job runner
+		scraper.cjs       # Puppeteer-extra stealth; profile + videos scraping
+		proxy.cjs         # Simple round-robin proxy manager
 	index.html
 src/
 	main/main.tsx     # React entry (MUI theme + basic dashboard)
-	services/database/DatabaseService.ts  # DB service (strict TS), for future adoption by IPC
+	services/database/DatabaseService.ts  # TS DB service (future use in IPC/services)
 	types/electron.d.ts # Preload API typings for window.electronAPI
 database/
 	migrations/        # SQL migrations (run on db:init)
@@ -94,6 +107,18 @@ database/
 config/
 	default.json
 ```
+
+## Using the app
+
+- Ping main: verifies secure IPC is working
+- Add creator: inserts `username` into the DB
+- Scrape (basic): queues a profile scrape for the username field
+- Video limit + Scrape Profile + Videos: scrapes recent posts/reels and ingests videos + metrics with deltas
+- Progress: shows running/video/success/error events during scraping
+
+Tips:
+- Keep the video limit small while testing (e.g., 3–5) to avoid rate-limits
+- You can add a proxy list via `PROXIES` to rotate requests
 
 ## Troubleshooting
 
@@ -105,17 +130,20 @@ config/
 - Port 5173 already in use
 	- Stop the conflicting process or change the port: edit `package.json` dev script to `vite --port 5174`
 
-- Native module errors for better-sqlite3
-	- We use prebuilt binaries via `electron-builder install-app-deps` after install
-	- If you still hit issues: `npm rebuild` or delete `node_modules` and run `npm install` again
+- Native module error: "better_sqlite3.node is not a valid Win32 application"
+	- Run: `npm run rebuild:native` to rebuild against your Electron version
+	- If issues persist, delete `node_modules` and `package-lock.json`, then reinstall and rebuild
 
 - TypeScript errors
 	- Run: `npx tsc --noEmit` to see details
 	- Ensure `@types/node` and `@types/better-sqlite3` are installed (they are in devDependencies)
 
-- Blank/white screen
-	- Open DevTools (Ctrl+Shift+I) and check the console for CSP or runtime errors
-	- In dev, CSP allows Vite HMR; if you changed CSP, restore the defaults in `public/electron/main.js`
+- Blank/white screen or GPU errors on Windows
+	- GPU is disabled by default in the app; if you still see issues, ensure your graphics drivers are up to date
+	- Check logs under `logs/app.log` for details
+
+- Tests fail on loading Vite config / ESM plugin
+	- The config avoids loading ESM React plugin under Vitest; ensure you’ve pulled latest changes and run `npm install`
 
 ## Security notes
 
@@ -123,13 +151,27 @@ config/
 - Do not expose `ipcRenderer` directly to the renderer
 - All DB writes use parameterized queries; user inputs are validated with Joi
 
-## Next steps (beyond Phase 1)
+## Backups
+
+- Nightly backups at 03:00 local time (SQLite file copy)
+- Location: `database/backups/analytics-YYYYMMDDHH.db` (keeps last 7)
+
+## Health check
+
+You can call from the renderer:
+
+```ts
+await window.electronAPI.health(); // => { db: boolean, queue: boolean, scraper: boolean }
+```
+
+## Next steps (beyond foundation)
 
 - Use `DatabaseService` within the main process and route all IPC DB calls through it
 - Add Winston logging and custom error classes (DatabaseError, ValidationError, ScrapingError)
-- Implement scraper scaffolding with `puppeteer-extra` stealth
-- Introduce Redux Toolkit store and hook-based data access for the UI
+- Harden scraping (error classification, proxy health checks)
+- Introduce Redux Toolkit state and charts (MUI DataGrid, @mui/x)
+- Expand tests (unit + integration for DB ingestion and queue behavior)
 
 ---
 
-If you want me to wire the IPC layer to `DatabaseService` and add logging now, say “refactor IPC to DatabaseService” and I’ll implement it in one pass.
+If you want me to add an always-visible “System Health” indicator in the header and a one-click "Profile + Videos" demo flow, say "add health indicator" and I’ll wire it in.

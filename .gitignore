@@ -1,1 +1,65 @@
+# Node / package managers
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Vite / Vitest
+dist/
+.vite/
+coverage/
+
+# Electron / builder outputs
+release/
+out/
+*.asar
+
+# Logs
+logs/
+*.log
+logs/*.log*
+app.log
+
+# SQLite databases and write-ahead logs
+*.db
+*.db-shm
+*.db-wal
+database/*.db
+database/*.db-shm
+database/*.db-wal
+database/backups/*.db
+
+# Environment & local config
+.env
+.env.*
+!*.example
+config/*.local.json
+config/*.secrets.json
+
+# Puppeteer caches (Chromium downloads)
+.local-chromium/
+.cache/puppeteer/
+
+# OS / Editor junk
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Build artifacts
+*.tgz
+*.zip
+*.tar
+*.tar.gz
+
+# TypeScript
+*.tsbuildinfo
+
+# Misc
+tmp/
+temp/
 node_modules

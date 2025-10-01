@@ -1,8 +1,17 @@
 const { app, BrowserWindow, shell, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
-require('./ipc-handlers.cjs');
+const cron = require('node-cron');
+const ipc = require('./ipc-handlers.cjs');
 const { logger } = require('./logger.cjs');
+let queueRef = null;
+
+// Mitigate Windows GPU process crashes by disabling GPU from the start
+try {
+  app.commandLine.appendSwitch('disable-gpu');
+  app.commandLine.appendSwitch('disable-software-rasterizer');
+  app.disableHardwareAcceleration();
+} catch {}
 
 let mainWindow;
 if (process.env.VITE_DEV_SERVER === 'true') {
@@ -92,6 +101,22 @@ function createWindow() {
 app.whenReady().then(() => {
   logger.info('App ready');
   createWindow();
+  // Lazy-init queue (singleton) to be able to close it on shutdown
+  ipc.getQueue().then(q => { queueRef = q; }).catch(e => logger.warn('Queue init failed/optional: %s', e.message));
+  try {
+    const { db } = require('./db.cjs');
+    // Nightly at 03:00 local time
+    cron.schedule('0 3 * * *', () => {
+      try {
+        const out = db.backup();
+        logger.info('Backup created at %s', out);
+      } catch (e) {
+        logger.error('Backup job failed: %s', e.message);
+      }
+    });
+  } catch (e) {
+    logger.warn('Backup scheduling skipped: %s', e.message);
+  }
   app.on('activate', () => {
     logger.info('Activate event');
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -102,3 +127,25 @@ app.on('window-all-closed', () => {
   logger.info('All windows closed');
   if (process.platform !== 'darwin') app.quit();
 });
+
+async function shutdown(code = 0) {
+  try {
+    if (queueRef && typeof queueRef.close === 'function') {
+      await queueRef.close();
+    }
+  } catch (e) {
+    logger.error('Error during shutdown: %s', e.message);
+  } finally {
+    app.exit(code);
+  }
+}
+
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught exception: %s', err.stack || err.message);
+});
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled rejection: %s', (reason && reason.stack) || String(reason));
+});
+process.on('SIGINT', () => shutdown(0));
+process.on('SIGTERM', () => shutdown(0));
+app.on('before-quit', () => { shutdown(0); });

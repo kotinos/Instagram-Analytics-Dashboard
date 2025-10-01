@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   scrape: {
     enqueue: (username) => ipcRenderer.invoke('scrape:enqueue', { username }),
     bulk: (usernames) => ipcRenderer.invoke('scrape:bulk', { usernames }),
+    profileAndVideos: (username, limit = 12) => ipcRenderer.invoke('scrape:profileAndVideos', { username, limit }),
     onProgress: (handler) => {
       const listener = (_event, payload) => handler(payload);
       ipcRenderer.on('scrape:progress', listener);
