@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws://localhost:5173 http://localhost:5173; font-src 'self' data:; object-src 'none'">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Instagram Analytics Dashboard</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- In dev, Vite serves /src/main/main.tsx; in prod, the Electron main loads dist/index.html directly. -->
+    <script type="module">
+      // If Vite is serving, import source entry; otherwise attempt to load built bundle.
+      const isHttp = location.protocol.startsWith('http');
+      if (isHttp) {
+        import('/src/main/main.tsx');
+      } else {
+        // When opened directly via file://public/index.html (fallback), try to load the hashed bundle from ../dist/assets
+        fetch('../dist/index.html').then(async (res) => {
+          const html = await res.text();
+          const match = html.match(/assets\/(index-[a-z0-9]+\.js)/i);
+          const file = match ? match[1] : null;
+          if (file) {
+            const script = document.createElement('script');
+            script.type = 'module';
+            script.src = `../dist/assets/${file}`;
+            document.body.appendChild(script);
+          } else {
+            console.error('Could not locate built bundle in dist');
+          }
+        }).catch(err => console.error('Failed to load dist index:', err));
+      }
+    </script>
+  </body>
+</html>

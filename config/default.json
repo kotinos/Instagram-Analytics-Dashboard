@@ -1,0 +1,5 @@
+{
+  "app": {
+    "dbPath": "./database/analytics.db"
+  }
+}

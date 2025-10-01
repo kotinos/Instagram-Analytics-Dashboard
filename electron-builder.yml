@@ -1,0 +1,19 @@
+appId: com.kotinos.instagram-analytics
+productName: Instagram Analytics Dashboard
+directories:
+  output: dist
+  buildResources: build
+files:
+  - "**/*"
+  - "!**/*.ts"
+  - "!**/node_modules/*/{CHANGELOG.md,README.md}"
+win:
+  target:
+    - target: nsis
+      arch: [x64, ia32]
+  icon: build/icon.ico
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
